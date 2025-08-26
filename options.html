@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session Tracker Options</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    .content {
+      padding: 30px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #333;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e1e5e9;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s;
+      width: 100%;
+    }
+    
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+    
+    .btn-secondary {
+      background: #6c757d;
+      margin-top: 10px;
+    }
+    
+    .status {
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: 500;
+    }
+    
+    .status.success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .status.error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .status.info {
+      background-color: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    
+    .help-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    
+    .section {
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e1e5e9;
+    }
+    
+    .section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+    
+    .section h2 {
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Session Tracker Settings</h1>
+    </div>
+    
+    <div class="content">
+      <div id="status" class="status" style="display: none;"></div>
+      
+      <div class="section">
+        <h2>Backend Configuration</h2>
+        <div class="form-group">
+          <label for="backendUrl">Backend URL</label>
+          <input type="url" id="backendUrl" placeholder="http://localhost:8082 or https://api.your-domain.com">
+          <div class="help-text">URL for your Spring Boot microservice</div>
+        </div>
+        
+        <div class="form-group">
+          <label for="apiKey">API Key (Optional)</label>
+          <input type="password" id="apiKey" placeholder="Enter API key if required">
+          <div class="help-text">Authorization header for production APIs</div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <h2>User Configuration</h2>
+        <div class="form-group">
+          <label for="userId">User ID</label>
+          <input type="text" id="userId" placeholder="Enter your user identifier">
+          <div class="help-text">Unique identifier for tracking your sessions</div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <h2>Session Behavior</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="idleThreshold">Idle Threshold (seconds)</label>
+            <input type="number" id="idleThreshold" placeholder="60" min="10" max="300" step="5">
+            <div class="help-text">Time before session is considered idle</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="heartbeatInterval">Heartbeat Interval (seconds)</label>
+            <input type="number" id="heartbeatInterval" placeholder="30" min="15" max="120" step="5">
+            <div class="help-text">How often to send progress updates</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <h2>Actions</h2>
+        <button id="saveBtn" class="btn">Save Settings</button>
+        <button id="resetBtn" class="btn btn-secondary">Reset to Defaults</button>
+      </div>
+      
+      <div class="section">
+        <h2>Testing</h2>
+        <button id="testConnectionBtn" class="btn">Test Backend Connection</button>
+        <div class="help-text">Verify your backend is accessible</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

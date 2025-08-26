@@ -3,6 +3,7 @@ class PopupManager {
     this.currentTab = null;
     this.sessionInfo = null;
     this.updateInterval = null;
+    this.settings = null;
     
     this.init();
   }
@@ -10,7 +11,7 @@ class PopupManager {
   async init() {
     await this.getCurrentTab();
     this.setupEventListeners();
-    this.loadSettings();
+    await this.loadSettings();
     this.updateUI();
     
     // Start periodic updates
@@ -51,17 +52,39 @@ class PopupManager {
     document.getElementById('exportDataBtn').addEventListener('click', () => {
       this.exportData();
     });
+
+    // Add options page link
+    const optionsLink = document.createElement('a');
+    optionsLink.href = 'options.html';
+    optionsLink.textContent = 'Settings';
+    optionsLink.className = 'btn-link';
+    optionsLink.style.marginTop = '10px';
+    optionsLink.style.display = 'block';
+    optionsLink.style.textAlign = 'center';
+    
+    document.querySelector('.footer-content').appendChild(optionsLink);
   }
 
   async loadSettings() {
     try {
-      const result = await chrome.storage.local.get(['apiKey', 'backendUrl', 'idleThreshold']);
+      const result = await chrome.storage.sync.get([
+        'backendUrl', 'apiKey', 'userId', 'idleThreshold', 'heartbeatInterval'
+      ]);
       
-      if (result.apiKey) {
-        document.getElementById('apiKey').value = result.apiKey;
-      }
+      this.settings = {
+        backendUrl: result.backendUrl || 'http://localhost:8082',
+        apiKey: result.apiKey || '',
+        userId: result.userId || '',
+        idleThreshold: result.idleThreshold || 60,
+        heartbeatInterval: result.heartbeatInterval || 30
+      };
+      
+      // Update UI with settings
       if (result.backendUrl) {
         document.getElementById('backendUrl').value = result.backendUrl;
+      }
+      if (result.apiKey) {
+        document.getElementById('apiKey').value = result.apiKey;
       }
       if (result.idleThreshold) {
         document.getElementById('idleThreshold').value = result.idleThreshold;
@@ -74,13 +97,19 @@ class PopupManager {
   async saveSettings() {
     try {
       const settings = {
-        apiKey: document.getElementById('apiKey').value,
-        backendUrl: document.getElementById('backendUrl').value,
-        idleThreshold: parseInt(document.getElementById('idleThreshold').value) || 30000
+        backendUrl: document.getElementById('backendUrl').value.trim(),
+        apiKey: document.getElementById('apiKey').value.trim(),
+        idleThreshold: parseInt(document.getElementById('idleThreshold').value) || 60
       };
 
+      // Validate required fields
+      if (!settings.backendUrl) {
+        this.showError('Backend URL is required');
+        return;
+      }
+
       await chrome.runtime.sendMessage({
-        type: 'UPDATE_SETTINGS',
+        type: 'SETTINGS_UPDATED',
         settings: settings
       });
 
@@ -105,45 +134,23 @@ class PopupManager {
     if (!this.currentTab) return;
 
     try {
-      // Check if current tab is a coding platform
-      if (this.isCodingPlatform(this.currentTab.url)) {
-        await this.updateSessionInfo();
-        this.showSessionInfo();
-      } else {
-        this.showNoSession();
-      }
-
-      await this.updateEvents();
-      this.updateStatusIndicator();
-
-    } catch (error) {
-      console.error('Failed to update UI:', error);
-      this.showError('Failed to update session info');
-    }
-  }
-
-  isCodingPlatform(url) {
-    if (!url) return false;
-    const hostname = new URL(url).hostname;
-    return hostname.includes('leetcode.com') || 
-           hostname.includes('geeksforgeeks.org') || 
-           hostname.includes('hackerrank.com');
-  }
-
-  async updateSessionInfo() {
-    try {
+      // Get session info from background script
       const response = await chrome.runtime.sendMessage({
         type: 'GET_SESSION_INFO'
       });
 
       if (response && response.success) {
         this.sessionInfo = response.data;
+        this.showSessionInfo();
       } else {
-        this.sessionInfo = null;
+        this.showNoSession();
       }
+
+      // Update events list
+      await this.updateEventsList();
+
     } catch (error) {
-      console.error('Failed to get session info:', error);
-      this.sessionInfo = null;
+      console.error('Failed to update UI:', error);
     }
   }
 
@@ -151,124 +158,68 @@ class PopupManager {
     document.getElementById('sessionInfo').style.display = 'block';
     document.getElementById('noSession').style.display = 'none';
 
-    if (this.sessionInfo) {
-      // Update platform info
-      document.getElementById('platformInfo').textContent = this.getPlatformDisplayName(this.sessionInfo.platform);
-      
-      // Update problem info
-      document.getElementById('problemInfo').textContent = this.sessionInfo.problemId || 'Unknown';
-      
-      // Update time info
-      this.updateTimeDisplay();
+    // Update session details
+    document.getElementById('platformInfo').textContent = this.getPlatformDisplayName(this.sessionInfo.platform || 'unknown');
+    document.getElementById('problemInfo').textContent = this.sessionInfo.problemTitle || 'Unknown Problem';
+    document.getElementById('activeTimeInfo').textContent = this.formatTime(this.sessionInfo.currentActiveTime || 0);
+    document.getElementById('totalTimeInfo').textContent = this.formatTime(this.sessionInfo.totalWallTime || 0);
+
+    // Update status indicator
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    
+    if (this.sessionInfo.isActive) {
+      statusDot.className = 'status-dot active';
+      statusText.textContent = 'Active';
+    } else {
+      statusDot.className = 'status-dot paused';
+      statusText.textContent = 'Paused';
+    }
+
+    // Update session actions
+    const pauseBtn = document.getElementById('pauseSessionBtn');
+    if (this.sessionInfo.isActive) {
+      pauseBtn.textContent = 'Pause';
+      pauseBtn.className = 'btn btn-warning';
+    } else {
+      pauseBtn.textContent = 'Resume';
+      pauseBtn.className = 'btn btn-success';
     }
   }
 
   showNoSession() {
     document.getElementById('sessionInfo').style.display = 'none';
     document.getElementById('noSession').style.display = 'block';
-  }
 
-  updateTimeDisplay() {
-    if (!this.sessionInfo) return;
-
-    const now = Date.now();
-    const activeTime = this.sessionInfo.isActive ? 
-      (now - this.sessionInfo.startTime) : 
-      (this.sessionInfo.lastActiveTime - this.sessionInfo.startTime);
+    // Update status indicator
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
     
-    const totalTime = now - this.sessionInfo.startTime;
-
-    document.getElementById('activeTimeInfo').textContent = this.formatDuration(activeTime);
-    document.getElementById('totalTimeInfo').textContent = this.formatDuration(totalTime);
+    statusDot.className = 'status-dot inactive';
+    statusText.textContent = 'No Session';
   }
 
-  formatDuration(ms) {
-    const seconds = Math.floor(ms / 1000);
+  getPlatformDisplayName(platform) {
+    const platformNames = {
+      'leetcode': 'LeetCode',
+      'geeksforgeeks': 'GeeksforGeeks',
+      'hackerrank': 'HackerRank',
+      'unknown': 'Unknown'
+    };
+    return platformNames[platform] || platform;
+  }
+
+  formatTime(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-
+    
     if (hours > 0) {
-      return `${hours}h ${minutes % 60}m`;
+      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
     } else if (minutes > 0) {
       return `${minutes}m ${seconds % 60}s`;
     } else {
       return `${seconds}s`;
-    }
-  }
-
-  getPlatformDisplayName(platform) {
-    const names = {
-      'leetcode': 'LeetCode',
-      'geeksforgeeks': 'GeeksforGeeks',
-      'hackerrank': 'HackerRank'
-    };
-    return names[platform] || platform;
-  }
-
-  async updateEvents() {
-    try {
-      const events = await this.getStoredEvents();
-      this.displayEvents(events.slice(-5)); // Show last 5 events
-    } catch (error) {
-      console.error('Failed to update events:', error);
-    }
-  }
-
-  async getStoredEvents() {
-    try {
-      const result = await chrome.storage.local.get(['events']);
-      return result.events || [];
-    } catch (error) {
-      console.error('Failed to get stored events:', error);
-      return [];
-    }
-  }
-
-  displayEvents(events) {
-    const eventsList = document.getElementById('eventsList');
-    
-    if (events.length === 0) {
-      eventsList.innerHTML = '<div class="event-item"><span>No events yet</span></div>';
-      return;
-    }
-
-    eventsList.innerHTML = events.map(event => {
-      const time = new Date(event.timestamp).toLocaleTimeString();
-      const type = event.eventType || 'Unknown';
-      const details = this.getEventDetails(event);
-      
-      return `
-        <div class="event-item">
-          <span class="event-time">${time}</span>
-          <span class="event-type">${type}</span>
-          <span class="event-details">${details}</span>
-        </div>
-      `;
-    }).join('');
-  }
-
-  getEventDetails(event) {
-    if (event.data) {
-      if (event.data.action) return event.data.action;
-      if (event.data.result) return event.data.result;
-      if (event.data.platform) return event.data.platform;
-    }
-    return '-';
-  }
-
-  updateStatusIndicator() {
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-
-    if (this.sessionInfo && this.sessionInfo.isActive) {
-      statusDot.className = 'status-dot active';
-      statusText.textContent = 'Active';
-    } else if (this.sessionInfo) {
-      statusDot.className = 'status-dot inactive';
-      statusText.textContent = 'Paused';
-    } else {
-      statusDot.className = 'status-dot error';
-      statusText.textContent = 'No Session';
     }
   }
 
@@ -283,6 +234,7 @@ class PopupManager {
 
       this.showSuccess('Session ended');
       this.updateUI();
+
     } catch (error) {
       console.error('Failed to end session:', error);
       this.showError('Failed to end session');
@@ -293,23 +245,79 @@ class PopupManager {
     if (!this.currentTab) return;
 
     try {
-      // Send message to content script to pause session
+      // Send message to content script to pause/resume session
       await chrome.tabs.sendMessage(this.currentTab.id, {
-        type: 'PAUSE_SESSION'
+        type: 'TOGGLE_SESSION'
       });
 
-      this.showSuccess('Session paused');
       this.updateUI();
+
     } catch (error) {
-      console.error('Failed to pause session:', error);
-      this.showError('Failed to pause session');
+      console.error('Failed to pause/resume session:', error);
+      this.showError('Failed to pause/resume session');
     }
+  }
+
+  async updateEventsList() {
+    try {
+      const result = await chrome.storage.local.get(['events']);
+      const events = result.events || [];
+      
+      const eventsList = document.getElementById('eventsList');
+      eventsList.innerHTML = '';
+
+      // Show last 10 events
+      const recentEvents = events.slice(-10).reverse();
+      
+      if (recentEvents.length === 0) {
+        eventsList.innerHTML = '<div class="event-item">No events yet</div>';
+        return;
+      }
+
+      recentEvents.forEach(event => {
+        const eventElement = document.createElement('div');
+        eventElement.className = 'event-item';
+        
+        const time = new Date(event.timestamp).toLocaleTimeString();
+        const type = event.eventType || 'Unknown';
+        const details = this.formatEventDetails(event.data);
+        
+        eventElement.innerHTML = `
+          <span class="event-time">${time}</span>
+          <span class="event-type">${type}</span>
+          <span class="event-details">${details}</span>
+        `;
+        
+        eventsList.appendChild(eventElement);
+      });
+
+    } catch (error) {
+      console.error('Failed to update events list:', error);
+    }
+  }
+
+  formatEventDetails(data) {
+    if (!data) return '-';
+    
+    if (typeof data === 'string') {
+      return data;
+    }
+    
+    if (data.platform) {
+      return `${data.platform} - ${data.problemTitle || 'Unknown Problem'}`;
+    }
+    
+    if (data.action) {
+      return data.action;
+    }
+    
+    return JSON.stringify(data).substring(0, 50) + '...';
   }
 
   async clearEvents() {
     try {
       await chrome.storage.local.remove(['events']);
-      this.updateEvents();
+      this.updateEventsList();
       this.showSuccess('Events cleared');
     } catch (error) {
       console.error('Failed to clear events:', error);
@@ -319,22 +327,19 @@ class PopupManager {
 
   async exportData() {
     try {
-      const events = await this.getStoredEvents();
-      const data = {
-        exportDate: new Date().toISOString(),
-        events: events
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const result = await chrome.storage.local.get(['events', 'retryQueue']);
+      const dataStr = JSON.stringify(result, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
       
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `session-data-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `session-tracker-data-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
       
       URL.revokeObjectURL(url);
-      this.showSuccess('Data exported');
+      this.showSuccess('Data exported successfully');
+      
     } catch (error) {
       console.error('Failed to export data:', error);
       this.showError('Failed to export data');
@@ -342,64 +347,68 @@ class PopupManager {
   }
 
   showSuccess(message) {
-    this.showNotification(message, 'success');
+    this.showMessage(message, 'success');
   }
 
   showError(message) {
-    this.showNotification(message, 'error');
+    this.showMessage(message, 'error');
   }
 
-  showNotification(message, type) {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
+  showMessage(message, type) {
+    // Create temporary message element
+    const messageElement = document.createElement('div');
+    messageElement.className = `message ${type}`;
+    messageElement.textContent = message;
+    messageElement.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      padding: 12px 16px;
-      border-radius: 6px;
+      padding: 10px 20px;
+      border-radius: 4px;
       color: white;
-      font-size: 13px;
       font-weight: 500;
       z-index: 1000;
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-      background: ${type === 'success' ? '#4caf50' : '#f44336'};
+      animation: slideIn 0.3s ease-out;
     `;
 
-    document.body.appendChild(notification);
+    if (type === 'success') {
+      messageElement.style.background = '#4caf50';
+    } else {
+      messageElement.style.background = '#f44336';
+    }
 
-    // Animate in
-    setTimeout(() => {
-      notification.style.transform = 'translateX(0)';
-    }, 100);
+    // Add animation styles
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+
+    document.body.appendChild(messageElement);
 
     // Remove after 3 seconds
     setTimeout(() => {
-      notification.style.transform = 'translateX(100%)';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
+      messageElement.remove();
+      style.remove();
     }, 3000);
   }
 
-  destroy() {
+  cleanup() {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
     }
   }
 }
 
-// Initialize popup when DOM is loaded
+// Initialize popup manager when page loads
 document.addEventListener('DOMContentLoaded', () => {
   const popupManager = new PopupManager();
   
-  // Cleanup when popup is closed
-  window.addEventListener('unload', () => {
-    popupManager.destroy();
+  // Cleanup when popup closes
+  window.addEventListener('beforeunload', () => {
+    popupManager.cleanup();
   });
 });
