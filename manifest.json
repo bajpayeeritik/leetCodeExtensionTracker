@@ -2,44 +2,47 @@
   "manifest_version": 3,
   "name": "Coding Platform Session Tracker",
   "version": "1.0.0",
-  "description": "Tracks session lifecycle events on coding platform pages like LeetCode and GFG",
-  "permissions": [
-    "storage",
-    "tabs",
-    "activeTab",
-    "scripting"
-  ],
-  "host_permissions": [
-    "https://leetcode.com/*",
-    "https://www.geeksforgeeks.org/*",
-    "https://www.hackerrank.com/*",
-    "http://localhost:8082/*",
-    "https://api.your-domain.com/*"
-  ],
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://leetcode.com/problems/*",
-        "https://leetcode.com/studyplan/*",
-        "https://www.geeksforgeeks.org/problems/*",
-        "https://www.hackerrank.com/challenges/*"
-      ],
-      "js": ["content.js"],
-      "run_at": "document_end"
-    }
-  ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "Session Tracker"
-  },
+  "description": "Tracks coding sessions on LeetCode, GeeksforGeeks, and HackerRank and reports to a backend.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "options_page": "options.html"
+  "action": {
+    "default_title": "Session Tracker",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_page": "options.html",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "https://www.geeksforgeeks.org/*",
+    "https://www.hackerrank.com/*",
+    "http://localhost:8082/*"
+  ],
+"content_scripts":  [
+{
+"matches": [
+"://leetcode.com/problems/",
+"://www.geeksforgeeks.org/problems/",
+"://www.hackerrank.com/challenges/"
+],
+"js": ["content.js"],
+"run_at": "document_idle"
+}
+],
+  "web_accessible_resources": [
+    {
+      "resources": [],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
