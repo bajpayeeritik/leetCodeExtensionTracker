@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session Tracker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Session Tracker</h1>
+      <div class="status-indicator" id="statusIndicator">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Checking...</span>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Session Info Section -->
+      <section class="session-info" id="sessionInfo" style="display: none;">
+        <h2>Current Session</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <label>Platform:</label>
+            <span id="platformInfo">-</span>
+          </div>
+          <div class="info-item">
+            <label>Problem:</label>
+            <span id="problemInfo">-</span>
+          </div>
+          <div class="info-item">
+            <label>Active Time:</label>
+            <span id="activeTimeInfo">-</span>
+          </div>
+          <div class="info-item">
+            <label>Total Time:</label>
+            <span id="totalTimeInfo">-</span>
+          </div>
+        </div>
+        
+        <div class="session-actions">
+          <button id="endSessionBtn" class="btn btn-danger">End Session</button>
+          <button id="pauseSessionBtn" class="btn btn-warning">Pause</button>
+        </div>
+      </section>
+
+      <!-- No Session Section -->
+      <section class="no-session" id="noSession" style="display: none;">
+        <div class="no-session-content">
+          <div class="icon">📝</div>
+          <h3>No Active Session</h3>
+          <p>Navigate to a coding problem page to start tracking</p>
+          <div class="supported-platforms">
+            <span class="platform-tag">LeetCode</span>
+            <span class="platform-tag">GeeksforGeeks</span>
+            <span class="platform-tag">HackerRank</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings Section -->
+      <section class="settings">
+        <h2>Settings</h2>
+        <div class="setting-item">
+          <label for="apiKey">API Key:</label>
+          <input type="password" id="apiKey" placeholder="Enter your API key">
+        </div>
+        <div class="setting-item">
+          <label for="backendUrl">Backend URL:</label>
+          <input type="url" id="backendUrl" placeholder="https://your-backend-api.com/api">
+        </div>
+        <div class="setting-item">
+          <label for="idleThreshold">Idle Threshold (ms):</label>
+          <input type="number" id="idleThreshold" placeholder="30000" min="5000" step="1000">
+        </div>
+        <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
+      </section>
+
+      <!-- Recent Events Section -->
+      <section class="recent-events">
+        <h2>Recent Events</h2>
+        <div class="events-list" id="eventsList">
+          <div class="event-item">
+            <span class="event-time">-</span>
+            <span class="event-type">-</span>
+            <span class="event-details">-</span>
+          </div>
+        </div>
+        <button id="clearEventsBtn" class="btn btn-secondary">Clear Events</button>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-content">
+        <span class="version">v1.0.0</span>
+        <button id="exportDataBtn" class="btn-link">Export Data</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
